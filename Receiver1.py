@@ -1,27 +1,58 @@
+# /* Yizhuo Yang s1800825 */
 import sys
 from socket import *
 
-if __name__ == '__main__':
-    s = socket(AF_INET, SOCK_DGRAM)
-    host = '127.0.0.1'
-    port = int(sys.argv[1])
-    file_name = sys.argv[2]
-    buf = 1027
-    addr = (host, port)
 
-    s.bind((host, port))
+class Receiver:
+    def __init__(self, port, file_name):
+        self.host = '127.0.0.1'
+        self.port = port
+        self.file_name = file_name
+        self.buffer = 1027
 
-    data, addr = s.recvfrom(buf)
-    print("Received File:", data.strip())
-    f = open(data.strip(), 'wb')
+    @staticmethod
+    def get_seq(packet):
+        seq = packet[0:2]
+        return int.from_bytes(seq, 'big')
 
-    data, addr = s.recvfrom(buf)
-    try:
-        while data:
-            f.write(data)
-            s.settimeout(2)
-            data, addr = s.recvfrom(buf)
-    except timeout:
-        f.close()
+    @staticmethod
+    def get_seq_b(packet):
+        return packet[0:2]
+
+    @staticmethod
+    def get_eof(packet):
+        return packet[2]
+
+    @staticmethod
+    def remove_header(packet):
+        return packet[3:]
+
+    @staticmethod
+    def receive_data(port, buffer):
+        localhost = '127.0.0.1'
+        s = socket(AF_INET, SOCK_DGRAM)
+        s.bind((localhost, port))
+        data, addr = s.recvfrom(buffer)
         s.close()
-        print("File Downloaded")
+        return data, addr
+
+    def receive_file(self):
+        content = bytes(0)
+        # print('Start')
+        file = open(self.file_name, 'wb')
+        while True:
+            data, addr = Receiver.receive_data(self.port, self.buffer)
+            # print(self.get_seq(data))
+            content += self.remove_header(data)
+            if self.get_eof(data) == 1 or not data:
+                break
+        file.write(content)
+        # print('End', len(content))
+
+
+if __name__ == '__main__':
+    PORT = int(sys.argv[1])
+    FILE_NAME = sys.argv[2]
+
+    receiver = Receiver(PORT, FILE_NAME)
+    receiver.receive_file()
